@@ -67,6 +67,8 @@ const PERMISSIONS = {
     IMPORT_FILES: 1,
     ADD_TAGS: 2,
     SEARCH_FILES: 3,
+    MANAGE_PAGES: 4,
+    MANAGE_COOKIES: 5
 };
 
 const STATUS_NUMBERS = {
@@ -177,31 +179,29 @@ export class Client {
         // Build querystring
         let url = this.address + endpoint;
         if ('queries' in options) {
-            url += "?q="
-            for (const query_key in queries) {
-                if (queries.hasOwnProperty(query_key)) {
-                    const query_value = object[query_key];
-                    url += query_key + "=" + query_value + "&";
+            url += "?"
+            for (const key in options.queries) {
+                if (options.queries.hasOwnProperty(key)) {
+                    let query_value = options.queries[key];
+                    if (typeof query_value === "object") query_value = JSON.stringify(query_value);
+                    url += key + "=" + query_value + "&";
                 }
             }
             // Remove the last &
             url = url.substr(0, url.length - 1);
         }
+        // Encode URI
+        url = encodeURI(url);
 
-        try {
-            const resource = await fetch(url, {
-                method: method,
-                headers: options.headers,
-                body: 'data' in options ? options.data : options.json
-            });
-            const response = await resource.json();
-            callback(response);
-        } catch (error) {
-            if (error instanceof ApiVersionMismatchError)
-                console.error(error.message);
-            else
-                console.error(new GenericApiError(error));
-        }
+        const resource = await fetch(url, {
+            method: method,
+            headers: options.headers,
+            body: 'data' in options ? options.data : options.json
+        });
+        console.log(resource);
+        const response = await resource.json();
+        callback(response);
+
     }
 
     //
