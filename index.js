@@ -1,6 +1,7 @@
 const default_api_address = 'http://127.0.0.1:45869';
 
-const api_version = 11;
+// TODO: Implement v13 features
+const api_version = 13;
 
 const ENDPOINTS = {
 
@@ -91,7 +92,7 @@ class GenericApiError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+        // Error.captureStackTrace(this, this.constructor);
     }
 }
 
@@ -99,7 +100,7 @@ class NotEnoughArgumentsError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+        // Error.captureStackTrace(this, this.constructor);
     }
 }
 
@@ -107,7 +108,7 @@ class IncorrectArgumentsError extends Error {
     constructor(message) {
         super(message);
         this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
+        // Error.captureStackTrace(this, this.constructor);
     }
 }
 
@@ -119,7 +120,7 @@ class ApiVersionMismatchError extends Error {
 }
 
 export class Client {
-    constructor(options) {
+    constructor(options = {}) {
         this.address = !('address' in options) ? this.default_api_address : options['address'];
         this.access_key = !('key' in options) ? '' : options['key'];
 
@@ -164,7 +165,7 @@ export class Client {
         return PAGE_TYPES;
     }
 
-    build_call(method, endpoint, callback, options = {}) {
+    async build_call(method, endpoint, callback, options = {}) {
         if (this.access_key !== '') {
             if (!(('headers' in options) && 'Hydrus-Client-API-Access-Key' in options.headers)) {
                 if (!('headers' in options))

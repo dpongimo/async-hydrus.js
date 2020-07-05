@@ -1,7 +1,7 @@
 {
     "name": "hydrus.js",
     "version": "1.4.1",
-    "description": "node.js module for using hydrus api",
+    "description": "esm module for using hydrus api",
     "keywords": [
         "api",
         "hydrus",
@@ -18,8 +18,5 @@
         "url": "https://github.com/cravxx/hydrus.js.git"
     },
     "license": "MIT",
-    "dependencies": {
-        "request": "^2.88.0",
-        "request-promise": "^4.2.5"
-    }
+    "dependencies": {}
 }
