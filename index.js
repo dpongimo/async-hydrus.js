@@ -1,5 +1,3 @@
-const rp = require('request-promise');
-
 const default_api_address = 'http://127.0.0.1:45869';
 
 const api_version = 11;
@@ -120,7 +118,7 @@ class ApiVersionMismatchError extends Error {
     }
 }
 
-module.exports = class Client {
+export class Client {
     constructor(options) {
         this.address = !('address' in options) ? this.default_api_address : options['address'];
         this.access_key = !('key' in options) ? '' : options['key'];
@@ -174,25 +172,35 @@ module.exports = class Client {
                 options.headers['Hydrus-Client-API-Access-Key'] = this.access_key;
             }
         }
-        rp({
+
+        // Build querystring
+        let url = this.address + endpoint;
+        if ('queries' in options) {
+            url += "?q="
+            for (const query_key in queries) {
+                if (queries.hasOwnProperty(query_key)) {
+                    const query_value = object[query_key];
+                    url += query_key + "=" + query_value + "&";
+                }
+            }
+            // Remove the last &
+            url = url.substr(0, url.length - 1);
+        }
+
+        try {
+            const resource = await fetch(url, {
                 method: method,
-                simple: true,
-                timeout: 5000,
-                json: true,
-                uri: this.address + endpoint,
                 headers: options.headers,
-                qs: options.queries,
-                body: 'data' in options ? options.data : options.json,
-            })
-            .then((response) => {
-                callback(response === undefined ? '' : response);
-            })
-            .catch((error) => {
-                if (error instanceof ApiVersionMismatchError)
-                    console.error(error.message);
-                else
-                    console.error(new GenericApiError(error));
+                body: 'data' in options ? options.data : options.json
             });
+            const response = await resource.json();
+            callback(response);
+        } catch (error) {
+            if (error instanceof ApiVersionMismatchError)
+                console.error(error.message);
+            else
+                console.error(new GenericApiError(error));
+        }
     }
 
     //
@@ -239,11 +247,11 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.REQUEST_NEW_PERMISSIONS,
             callback, {
-                queries: {
-                    name: name,
-                    basic_permissions: JSON.stringify(permissions),
-                },
-            }
+            queries: {
+                name: name,
+                basic_permissions: JSON.stringify(permissions),
+            },
+        }
         );
     }
 
@@ -283,11 +291,11 @@ module.exports = class Client {
                     path: options.path,
                 },
             } : {
-                headers: {
-                    'Content-Type': 'application/octet-stream',
-                },
-                data: options.bytes,
-            }
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                    },
+                    data: options.bytes,
+                }
         );
     }
 
@@ -332,8 +340,8 @@ module.exports = class Client {
             'POST',
             ENDPOINTS.ADD_TAGS,
             callback, {
-                json,
-            }
+            json,
+        }
         );
     }
 
@@ -347,10 +355,10 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.CLEAN_TAGS,
             callback, {
-                queries: {
-                    tags: JSON.stringify(tags),
-                },
-            }
+            queries: {
+                tags: JSON.stringify(tags),
+            },
+        }
         );
     }
 
@@ -379,10 +387,10 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_URL_FILES,
             callback, {
-                queries: {
-                    url: url,
-                },
-            }
+            queries: {
+                url: url,
+            },
+        }
         );
     }
 
@@ -396,10 +404,10 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_URL_INFO,
             callback, {
-                queries: {
-                    url: url,
-                },
-            }
+            queries: {
+                url: url,
+            },
+        }
         );
     }
 
@@ -439,8 +447,8 @@ module.exports = class Client {
             'POST',
             ENDPOINTS.ADD_URL,
             callback, {
-                json,
-            }
+            json,
+        }
         );
     }
 
@@ -490,8 +498,8 @@ module.exports = class Client {
             'POST',
             ENDPOINTS.ASSOCIATE_URL,
             callback, {
-                json,
-            }
+            json,
+        }
         );
     }
 
@@ -528,12 +536,12 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.SEARCH_FILES,
             callback, {
-                queries: {
-                    'tags': JSON.stringify(actions.tags),
-                    'system_inbox': system_inbox,
-                    'system_archive': system_archive
-                },
-            }
+            queries: {
+                'tags': JSON.stringify(actions.tags),
+                'system_inbox': system_inbox,
+                'system_archive': system_archive
+            },
+        }
         );
     }
 
@@ -570,8 +578,8 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_FILE_METADATA,
             callback, {
-                queries,
-            }
+            queries,
+        }
         );
     }
 
@@ -596,8 +604,8 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_FILE,
             callback, {
-                queries,
-            }
+            queries,
+        }
         );
     }
 
@@ -622,8 +630,8 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_THUMBNAIL,
             callback, {
-                queries,
-            }
+            queries,
+        }
         );
     }
 
@@ -636,10 +644,10 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_COOKIES,
             callback, {
-                queries: {
-                    'domain': domain,
-                },
-            }
+            queries: {
+                'domain': domain,
+            },
+        }
         );
     }
 
@@ -652,8 +660,8 @@ module.exports = class Client {
             'POST',
             ENDPOINTS.SET_COOKIES,
             callback, {
-                json,
-            }
+            json,
+        }
         );
     }
 
@@ -687,8 +695,8 @@ module.exports = class Client {
             'GET',
             ENDPOINTS.GET_PAGE_INFO,
             callback, {
-                queries,
-            }
+            queries,
+        }
         );
     }
 
@@ -707,8 +715,8 @@ module.exports = class Client {
             'POST',
             ENDPOINTS.FOCUS_PAGE,
             callback, {
-                json,
-            }
+            json,
+        }
         );
     }
 
