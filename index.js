@@ -204,7 +204,7 @@ export class Client {
         if (resource.ok) {
             return await resource.json();
         } else {
-            throw GenericApiError(resource);
+            throw new GenericApiError(resource.statusText);
         }
     }
 
