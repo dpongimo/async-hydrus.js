@@ -125,14 +125,6 @@ export class Client {
     constructor(options = {}) {
         this.address = !('address' in options) ? this.default_api_address : options['address'];
         this.access_key = !('key' in options) ? '' : options['key'];
-
-        this.api_version((response) => {
-            if (response.version > api_version) {
-                throw new ApiVersionMismatchError(`You are using an older version of hydrus.js (${api_version}) that may not work with the newer api (${response.version}). Please check if there is an update available!`);
-            } else if (api_version > response.version) {
-                throw new ApiVersionMismatchError(`This version of hydrus.js (${api_version}) is built for a newer version of the api than what your hydrus installation is currently using (${response.version}). Please update your hydrus.`);
-            }
-        });
     }
 
     get default_api_address() {
@@ -167,7 +159,15 @@ export class Client {
         return PAGE_TYPES;
     }
 
-    async build_call(method, endpoint, callback, options = {}) {
+    /**
+     * Internal method to package and send a query to the Hydrus Client API.
+     * Will throw errors if an HTTP request is not 'OK'
+     * 
+     * @param {"GET"|"SET"|"PUT"|"POST"|"DELETE"} method 
+     * @param {URL} endpoint 
+     * @param {*} options 
+     */
+    async build_call(method, endpoint, options = {}) {
         if (this.access_key !== '') {
             if (!(('headers' in options) && 'Hydrus-Client-API-Access-Key' in options.headers)) {
                 if (!('headers' in options))
@@ -193,15 +193,19 @@ export class Client {
         // Encode URI
         url = encodeURI(url);
 
+        // Send request
         const resource = await fetch(url, {
             method: method,
             headers: options.headers,
             body: 'data' in options ? options.data : options.json
         });
-        console.log(resource);
-        const response = await resource.json();
-        callback(response);
 
+        // Test, then parse request
+        if (resource.ok) {
+            return await resource.json();
+        } else {
+            throw GenericApiError(resource);
+        }
     }
 
     //
@@ -211,27 +215,35 @@ export class Client {
      * Gets the current API version.
      * always returns json
      * (Does not require header)
-     * @param {*} callback returns response
      */
-    api_version(callback) {
-        this.build_call(
+    async api_version() {
+        return await this.build_call(
             'GET',
-            ENDPOINTS.API_VERSION,
-            callback
+            ENDPOINTS.API_VERSION
         );
+    }
+
+    /**
+     * Checks if the hydrus API version matches this API version
+     */
+    async api_check() {
+        const { version } = await this.api_version();
+        if (version > api_version) {
+            throw new ApiVersionMismatchError(`You are using an older version of hydrus.js (${api_version}) that may not work with the newer api (${version}). Please check if there is an update available!`);
+        } else if (api_version > version) {
+            throw new ApiVersionMismatchError(`This version of hydrus.js (${api_version}) is built for a newer version of the api than what your hydrus installation is currently using (${version}). Please update your hydrus.`);
+        }
     }
 
     /**
      * Gets a session key
      * always returns json
      * (Does not require header)
-     * @param {*} callback returns response
      */
-    session_key(callback) {
-        this.build_call(
+    async session_key() {
+        return await this.build_call(
             'GET',
-            ENDPOINTS.SESSION_KEY,
-            callback
+            ENDPOINTS.SESSION_KEY
         );
     }
 
@@ -239,35 +251,32 @@ export class Client {
      * Register a new external program with the client.
      * This requires the 'add from api request' mini-dialog
      * under services->review services to be open, otherwise it will 403.
-     * @param {*} name descriptive name of your access
-     * @param {*} permissions a list of permission identifiers you want to request
-     * @param {*} callback returns response
+     * @param {String} name descriptive name of your access
+     * @param {Array<Number>} permissions a list of permission identifiers you want to request
      */
-    request_new_permissions(name, permissions, callback) {
-        this.build_call(
+    async request_new_permissions(name, permissions) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.REQUEST_NEW_PERMISSIONS,
-            callback, {
-            queries: {
-                name: name,
-                basic_permissions: JSON.stringify(permissions),
-            },
-        }
+            {
+                queries: {
+                    name: name,
+                    basic_permissions: JSON.stringify(permissions),
+                },
+            }
         );
     }
 
     /**
      * Check if your access key is valid (will check the one you intialized your client with by default)
-     * @param {*} callback returns response
-     * @param {*} key if you wish, you can pass a specific key you want to check
+     * @param {String} key if you wish, you can pass a specific key you want to check
      */
-    verify_access_key(callback, key = '') {
-        var options =
+    async verify_access_key(key = '') {
+        const options =
             (key !== '') ? { headers: { 'Hydrus-Client-API-Access-Key': key } } : {};
-        this.build_call(
+        return await this.build_call(
             'GET',
             ENDPOINTS.VERIFY_ACCESS_KEY,
-            callback,
             options
         );
     }
@@ -279,14 +288,15 @@ export class Client {
      * Tell the client to import a file.
      * supply a json with either bytes : *file bytes* 
      * or path: *file path*
-     * @param {*} file path to the file
-     * @param {*} callback returns response
+     * 
+     * TODO: Reimplement
+     * @param {String} file path to the file
      */
-    add_file(options, callback) {
-        this.build_call(
+    async add_file(options) {
+        console.warn("add_file is not tested");
+        return await this.build_call(
             'POST',
             ENDPOINTS.ADD_FILE,
-            callback,
             'path' in options ? {
                 json: {
                     path: options.path,
@@ -306,11 +316,10 @@ export class Client {
     /**
      * 
      * @param {*} actions (an Object of service names to lists of tags to be 'added' to the files) or an  ( Object of service names to content update actions to lists of tags)
-     * @param {*} hash You can use either 'hash' or 'hashes',
-     * @param {*} callback 
+     * @param {String} hash You can use either 'hash' or 'hashes',
      */
-    add_tags(actions, hash, callback) {
-        var json = {};
+    async add_tags(actions, hash) {
+        let json = {};
         if (!('service_names_to_tags' in actions || 'service_names_to_actions_to_tags' in actions)) {
             throw new NotEnoughArgumentsError('You must have at least one \'service_names...\' argument');
         } else {
@@ -337,41 +346,39 @@ export class Client {
                 }
             }
         }
-        this.build_call(
+
+        return await this.build_call(
             'POST',
             ENDPOINTS.ADD_TAGS,
-            callback, {
-            json,
-        }
+            {
+                json,
+            }
         );
     }
 
     /**
      * Ask the client about how it will see certain tags.
-     * @param {*} tags 
-     * @param {*} callback 
+     * @param {Array<String>} tags 
      */
-    clean_tags(tags, callback) {
-        this.build_call(
+    async clean_tags(tags) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.CLEAN_TAGS,
-            callback, {
-            queries: {
-                tags: JSON.stringify(tags),
-            },
-        }
+            {
+                queries: {
+                    tags: JSON.stringify(tags),
+                },
+            }
         );
     }
 
     /**
      * Ask the client about its tag services
-     * @param {*} callback returns response
      */
-    get_tag_services(callback) {
-        this.build_call(
+    async get_tag_services() {
+        return await this.build_call(
             'GET',
-            ENDPOINTS.GET_TAG_SERVICES,
-            callback
+            ENDPOINTS.GET_TAG_SERVICES
         );
     }
 
@@ -380,44 +387,41 @@ export class Client {
 
     /**
      * Ask the client about a URL's files.
-     * @param {*} url url you want to check
-     * @param {*} callback returns response
+     * @param {URL} url url you want to check
      */
-    get_url_files(url, callback) {
-        this.build_call(
+    async get_url_files(url) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_URL_FILES,
-            callback, {
-            queries: {
-                url: url,
-            },
-        }
+            {
+                queries: {
+                    url: url,
+                },
+            }
         );
     }
 
     /**
      * Ask the client for information about a URL.
-     * @param {*} url url you want to check
-     * @param {*} callback returns response
+     * @param {URL} url url you want to check
      */
-    get_url_info(url, callback) {
-        this.build_call(
+    async get_url_info(url, callback) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_URL_INFO,
-            callback, {
-            queries: {
-                url: url,
-            },
-        }
+            {
+                queries: {
+                    url: url,
+                },
+            }
         );
     }
 
     /**
      * Tell the client to 'import' a URL. This triggers the exact same routine as drag-and-dropping a text URL onto the main client window.
-     * @param {*} actions
-     * @param {*} callback returns response
+     * @param {Object} actions
      */
-    add_url(actions, callback) {
+    async add_url(actions) {
         var json = {}
         if (!('url' in actions)) {
             throw new NotEnoughArgumentsError('You must have a url argument');
@@ -444,22 +448,22 @@ export class Client {
                 }
             }
         }
-        this.build_call(
+        return await this.build_call(
             'POST',
             ENDPOINTS.ADD_URL,
-            callback, {
-            json,
-        }
+            {
+                json
+            }
         );
     }
 
     /**
      * Manage which URLs the client considers to be associated with which files.
-     * @param {*} actions contains 'to_add' or 'to_delete' actions for urls. can be single urls or list
-     * @param {*} hash the hash of the file you want to edit
+     * @param {Object} actions contains 'to_add' or 'to_delete' actions for urls. can be single urls or list
+     * @param {String} hash the hash of the file you want to edit
      */
-    associate_url(actions, hash, callback) {
-        var json = {};
+    async associate_url(actions, hash) {
+        let json = {};
         if (!('to_add' in actions || 'to_delete' in actions)) {
             throw new NotEnoughArgumentsError('You must have at least one \'to_delete\' or \'to_add\' argument');
         } else {
@@ -495,12 +499,12 @@ export class Client {
                 json.hash = hash;
             }
         }
-        this.build_call(
+        return await this.build_call(
             'POST',
             ENDPOINTS.ASSOCIATE_URL,
-            callback, {
-            json,
-        }
+            {
+                json
+            }
         );
     }
 
@@ -508,51 +512,28 @@ export class Client {
 
     /**
      * Search for the client's files.
-     * @param {*} url url you want to check
-     * @param {*} callback returns response
+     * @param {Array<string>} tags url you want to check
      */
-    search_files(actions, callback) {
-        var system_inbox = false;
-        var system_archive = false;
-        if (!('tags' in actions)) {
-            throw new NotEnoughArgumentsError();
-        } else {
-            if ('system_inbox' in actions) {
-                if (typeof actions.system_inbox === 'boolean') {
-                    system_inbox = actions.system_inbox;
-                } else {
-                    throw new IncorrectArgumentsError('value of system_inbox is of improper type: expects boolean')
-                }
-            }
-            if ('system_archive' in actions) {
-                if (typeof actions.system_archive === 'boolean') {
-                    system_archive = actions.system_archive;
-                } else {
-                    throw new IncorrectArgumentsError('value of system_archive is of improper type: expects boolean')
-                }
-            }
-        }
-
-        this.build_call(
+    async search_files(tags, system_inbox = false, system_archive = false) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.SEARCH_FILES,
-            callback, {
-            queries: {
-                'tags': JSON.stringify(actions.tags),
-                'system_inbox': system_inbox,
-                'system_archive': system_archive
-            },
-        }
+            {
+                queries: {
+                    'tags': JSON.stringify(tags),
+                    'system_inbox': system_inbox,
+                    'system_archive': system_archive
+                },
+            }
         );
     }
 
     /**
      * Get a file's metadata
      * @param {*} actions
-     * @param {*} callback 
      */
-    get_file_metadata(actions, callback) {
-        var queries = {}
+    async get_file_metadata(actions) {
+        let queries = {}
         if (('file_ids' in actions) && ('hashes' in actions)) {
             throw new IncorrectArgumentsError('only one argument is required, choose either file_ids or hashes');
         } else {
@@ -575,22 +556,21 @@ export class Client {
             }
         }
         console.log(queries);
-        this.build_call(
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_FILE_METADATA,
-            callback, {
-            queries,
-        }
+            {
+                queries,
+            }
         );
     }
 
     /**
      * Get a file
      * @param {*} actions
-     * @param {*} callback 
      */
-    get_file(actions, callback) {
-        var queries = {}
+    async get_file(actions) {
+        let queries = {}
         if (('file_id' in actions) && ('hash' in actions)) {
             throw new IncorrectArgumentsError('only one argument is required, choose either file_id or hash');
         } else {
@@ -604,19 +584,18 @@ export class Client {
         this.build_call(
             'GET',
             ENDPOINTS.GET_FILE,
-            callback, {
-            queries,
-        }
+            {
+                queries,
+            }
         );
     }
 
     /**
      * Get a file's thumbnail.
      * @param {*} actions
-     * @param {*} callback 
      */
-    get_thumbnail(actions, callback) {
-        var queries = {}
+    async get_thumbnail(actions) {
+        let queries = {}
         if (('file_id' in actions) && ('hash' in actions)) {
             throw new IncorrectArgumentsError('only one argument is required, choose either file_id or hash');
         } else {
@@ -627,12 +606,12 @@ export class Client {
                 queries.hash = actions.hash;
             }
         }
-        this.build_call(
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_THUMBNAIL,
-            callback, {
-            queries,
-        }
+            {
+                queries,
+            }
         );
     }
 
@@ -640,49 +619,47 @@ export class Client {
      * Get the cookies for a particular domain.
      * @param {*} callback returns response
      */
-    get_cookies(domain, callback) {
-        this.build_call(
+    async get_cookies(domain) {
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_COOKIES,
-            callback, {
-            queries: {
-                'domain': domain,
-            },
-        }
+            {
+                queries: {
+                    'domain': domain,
+                },
+            }
         );
     }
 
     /**
      * Set some new cookies for the client. This makes it easier to 'copy' a login from a web browser or similar to hydrus if hydrus's login system can't handle the site yet.
-     * @param {*} callback returns response
+     * @param {*} json 
      */
-    set_cookies(json, callback) {
-        this.build_call(
+    async set_cookies(json) {
+        return await this.build_call(
             'POST',
             ENDPOINTS.SET_COOKIES,
-            callback, {
-            json,
-        }
+            {
+                json,
+            }
         );
     }
 
     /**
      * Get the page structure of the current UI session.
-     * @param {*} callback returns response
      */
-    get_pages(callback) {
-        this.build_call(
+    async get_pages() {
+        return await this.build_call(
             'GET',
-            ENDPOINTS.GET_PAGES,
-            callback
+            ENDPOINTS.GET_PAGES
         );
     }
 
     /**
      * Get information about a specific page.
-     * @param {*} callback returns response
+     * @param {Object} actions 
      */
-    get_page_info(actions, callback) {
+    async get_page_info(actions) {
         var queries = {}
         if (!('page_key' in actions)) {
             throw new IncorrectArgumentsError('page_key argument required');
@@ -692,32 +669,32 @@ export class Client {
                 queries.simple = actions.simple;
             }
         }
-        this.build_call(
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_PAGE_INFO,
-            callback, {
-            queries,
-        }
+            {
+                queries
+            }
         );
     }
 
     /**
      * 'Show' a page in the main GUI, making it the current page in view. If it is already the current page, no change is made.
-     * @param {*} callback returns response
+     * @param {*} actions 
      */
-    focus_page(actions, callback) {
+    async focus_page(actions) {
         var json = {}
         if ('page_key' in actions) {
             json.page_key = actions.page_key;
         } else {
             throw new IncorrectArgumentsError('page_key argument required');
         }
-        this.build_call(
+        return await this.build_call(
             'POST',
             ENDPOINTS.FOCUS_PAGE,
-            callback, {
-            json,
-        }
+            {
+                json,
+            }
         );
     }
 
