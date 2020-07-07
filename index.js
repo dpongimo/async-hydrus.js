@@ -166,6 +166,7 @@ export class Client {
      * @param {"GET"|"SET"|"PUT"|"POST"|"DELETE"} method 
      * @param {URL} endpoint 
      * @param {*} options 
+     * @returns {Object | Blob}
      */
     async build_call(method, endpoint, options = {}) {
         if (this.access_key !== '') {
@@ -193,6 +194,8 @@ export class Client {
         // Encode URI
         url = encodeURI(url);
 
+        let parse = 'parse' in options ? options.parse : "json";
+
         // Send request
         const resource = await fetch(url, {
             method: method,
@@ -202,7 +205,13 @@ export class Client {
 
         // Test, then parse request
         if (resource.ok) {
-            return await resource.json();
+            switch (parse) {
+                case "blob":
+                    return await resource.blob();
+                case "json":
+                default:
+                    return await resource.json();
+            }
         } else {
             throw new GenericApiError(resource.statusText);
         }
@@ -581,11 +590,12 @@ export class Client {
                 queries.hash = actions.hash;
             }
         }
-        this.build_call(
+        return await this.build_call(
             'GET',
             ENDPOINTS.GET_FILE,
             {
-                queries,
+                parse: "blob",
+                queries
             }
         );
     }
@@ -610,6 +620,7 @@ export class Client {
             'GET',
             ENDPOINTS.GET_THUMBNAIL,
             {
+                parse: "blob",
                 queries,
             }
         );

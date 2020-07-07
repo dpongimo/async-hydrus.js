@@ -1,6 +1,6 @@
 {
-    "name": "hydrus.js",
-    "version": "1.4.1",
+    "name": "async-hydrus.js",
+    "version": "1.0.0",
     "description": "esm module for using hydrus api",
     "keywords": [
         "api",
@@ -13,9 +13,12 @@
     ],
     "main": "index.js",
     "author": "cravxx",
+    "maintainers": [
+        "dpongimo"
+    ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/cravxx/hydrus.js.git"
+        "url": "https://github.com/dpongimo/async-hydrus.js.git"
     },
     "license": "MIT",
     "dependencies": {}
