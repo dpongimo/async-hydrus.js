@@ -123,39 +123,39 @@ class ApiVersionMismatchError extends Error {
 
 export class Client {
     constructor(options = {}) {
-        this.address = !('address' in options) ? this.default_api_address : options['address'];
+        this.address = !('address' in options) ? Client.default_api_address : options['address'];
         this.access_key = !('key' in options) ? '' : options['key'];
     }
 
-    get default_api_address() {
+    static get default_api_address() {
         return default_api_address;
     }
 
-    get ENDPOINTS() {
+    static get ENDPOINTS() {
         return ENDPOINTS;
     }
 
-    get FILE_STATUS() {
+    static get FILE_STATUS() {
         return FILE_STATUS;
     }
 
-    get TAG_ACTIONS() {
+    static get TAG_ACTIONS() {
         return TAG_ACTIONS;
     }
 
-    get URL_TYPE() {
+    static get URL_TYPE() {
         return URL_TYPE;
     }
 
-    get PERMISSIONS() {
+    static get PERMISSIONS() {
         return PERMISSIONS;
     }
 
-    get STATUS_NUMBERS() {
+    static get STATUS_NUMBERS() {
         return STATUS_NUMBERS;
     }
 
-    get PAGE_TYPES() {
+    static get PAGE_TYPES() {
         return PAGE_TYPES;
     }
 
