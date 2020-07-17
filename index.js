@@ -564,7 +564,6 @@ export class Client {
                 queries.only_return_identifiers = actions.only_return_identifiers;
             }
         }
-        console.log(queries);
         return await this.build_call(
             'GET',
             ENDPOINTS.GET_FILE_METADATA,
